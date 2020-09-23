@@ -54,6 +54,7 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             # import pdb; pdb.set_trace()
             loss = loss_fn(logits.view(-1, config.num_labels), batch.labels.view(-1))
             loss.backward()
+            torch.nn.utils.clip_grad_norm(model.parameters(), 10.)
             optimizer.step()
             lr_scheduler.step()
             if batch.labels.size(0)>1:
