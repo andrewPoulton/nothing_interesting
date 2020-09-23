@@ -94,7 +94,7 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             # import pdb; pdb.set_trace()
             epoch_loss += loss.item()
             # if i % config.log_interval == 0:
-            wandb.log({"Test Accuracy": acc, "Test Loss": loss.item(), "Gradient Norm": grad_norm(model).item(), "Learning Rate": optimizer.param_groups[0]['lr']})
+            wandb.log({"Train Accuracy": acc, "Train Loss": loss.item(), "Gradient Norm": grad_norm(model).item(), "Learning Rate": optimizer.param_groups[0]['lr']})
             pbar.set_description(f'global_step: {lr_scheduler.last_epoch}| loss: {loss.item():.4f}| acc: {acc*100:.1f}%| epoch_av_loss: {epoch_loss/(i+1):.4f} |')
             pbar.update(1)
             if lr_scheduler.last_epoch > config.total_steps:
@@ -131,6 +131,10 @@ def main(data, val_data, config):
             torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model{val_acc:.1f}.pt'))
             best_val_acc = val_acc
         print('av_epoch_loss', av_epoch_loss)
+        if av_epoch_loss < .1:
+            break
+    torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
+
 
 
 
