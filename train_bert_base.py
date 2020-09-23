@@ -29,12 +29,16 @@ def init_dataloader(dataset, batch_size=32, random=True):
 def init_model(type_vocab_size):
     model = transformers.BertForSequenceClassification.from_pretrained('bert-base-uncased')
     model.config.token_type_embeddings = type_vocab_size 
-    model.bert.embeddings.token_type_embeddings = torch.nn.Embedding(type_vocab_size, model.config.hidden_size)
+    emb = torch.nn.Embedding(type_vocab_size, model.config.hidden_size)
+    emb.weight.data.normal_(mean=0.0, std = model.config.initializer_range)  
+    model.bert.embeddings.token_type_embeddings = emb
     return model
 
 def init_optimizer(model, config):
     return torch.optim.Adam(model.parameters(), lr = config.max_lr)
 
+def grad_norm(model):
+    return sum([p.grad.pow(2).sum() if p.grad is not None else torch.tensor(0.) for p in model.parameters()])**.5 
 
 def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
     loss_fn = torch.nn.CrossEntropyLoss()
@@ -59,8 +63,8 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             # if torch._np.isnan(loss.item()):
             # import pdb; pdb.set_trace()
             epoch_loss += loss.item()
-            if i % config.log_interval == 0:
-                    wandb.log({"Test Accuracy": acc, "Test Loss": loss.item()})
+            # if i % config.log_interval == 0:
+            wandb.log({"Test Accuracy": acc, "Test Loss": loss.item(), "Gradient Norm": grad_norm(model).item(), "Learning Rate": optimizer.param_groups[0]['lr']})
             pbar.set_description(f'global_step: {lr_scheduler.last_epoch}| loss: {loss.item():.4f}| acc: {acc*100:.1f}%| epoch_av_loss: {epoch_loss/(i+1):.4f} |')
             pbar.update(1)
             if lr_scheduler.last_epoch > config.total_steps:
