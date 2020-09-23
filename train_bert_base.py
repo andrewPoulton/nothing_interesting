@@ -18,7 +18,7 @@ wandb.init(project="prescalenorm")
 
 
 def init_dataset(data):
-    return dataset.SemEvalDataset('data/flat_semeval5way_train.csv') 
+    return dataset.SemEvalDataset(data) 
 
 def init_dataloader(dataset, batch_size=32, random=True):
     sampler = RandomSampler(dataset) if random else SequentialSampler(dataset)
@@ -40,6 +40,35 @@ def init_optimizer(model, config):
 def grad_norm(model):
     return sum([p.grad.pow(2).sum() if p.grad is not None else torch.tensor(0.) for p in model.parameters()])**.5 
 
+def metrics(predictions, y_true, metric_params):
+    precision = precision_score(y_true, predictions, **metric_params)
+    recall = recall_score(y_true, predictions, **metric_params)
+    f1 = f1_score(y_true, predictions, **metric_params)
+    accuracy = accuracy_score(y_true, predictions)
+    return precision, recall, f1, accuracy
+
+@torch.no_grad()          
+def val_loop(model, loader, cuda):
+    model.eval()
+    # batches = list(loader)
+    preds = [] 
+    true_labels = [] 
+    with tqdm(total= len(loader.batch_sampler)) as pbar:
+        for i,batch in enumerate(loader):
+            if cuda:
+                batch.cuda()
+            mask = generate_mask(batch)
+            logits = model(input_ids = batch.input, attention_mask = mask, token_type_ids = batch.token_type_ids)
+            logits = logits[0]
+            preds.append(logits.argmax(-1).squeeze().cpu())
+            true_labels.append(batch.labels.cpu())
+            pbar.update(1)
+    preds = torch.cat(preds)
+    y_true = torch.cat(true_labels)
+    model.train()
+    metric_params = {'average':'weighted', 'labels':list(range(model.config.num_labels))}
+    return metrics(preds, y_true, metric_params)
+
 def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
     loss_fn = torch.nn.CrossEntropyLoss()
     with tqdm(total=len(loader.batch_sampler)) as pbar:
@@ -54,7 +83,7 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             # import pdb; pdb.set_trace()
             loss = loss_fn(logits.view(-1, config.num_labels), batch.labels.view(-1))
             loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), 10.)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 10.)
             optimizer.step()
             lr_scheduler.step()
             if batch.labels.size(0)>1:
@@ -72,13 +101,19 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
                 break
         return epoch_loss/(i+1)
         
-def main(data,config):
+def main(data, val_data, config):
     config = load_config(config)
     dataset = init_dataset(data)
     dataset.train_percent = config.train_data_percent
     dataset.set_data_source(config.data_source)
     loader = init_dataloader(dataset, batch_size=config.batch_size)
     model = init_model(type_vocab_size=config.type_vocab_size)
+
+    val_dataset = init_dataset(val_data)
+    val_dataset.train_percent = config.val_data_percent
+    val_dataset.to_val_mode('scientsbank', 'answer')
+    val_loader = init_dataloader(val_dataset, batch_size=config.batch_size, random=False)
+
     wandb.watch(model)
     model.train()
     cuda = torch.cuda.is_available()
@@ -86,10 +121,15 @@ def main(data,config):
         model.cuda()
     optimizer = init_optimizer(model, config)
     lr_scheduler = transformers.get_cosine_schedule_with_warmup(optimizer, config.warmup_steps, config.total_steps)
-
+    best_val_acc = 0.0
     while lr_scheduler.last_epoch <= config.total_steps:
         av_epoch_loss =  train_epoch(loader, model, optimizer, lr_scheduler, config, cuda)
-        torch.save(model.state_dict(), os.path.join(wandb.run.dir, 'full_bert_model.pt'))
+        p,r,f1,val_acc = val_loop(model, val_loader, cuda)
+        log_line = f'precision: {p:.5f} | recall: {r:.5f} | f1: {f1:.5f} | accuracy: {val_acc:.5f}\n'
+        print(log_line[:-1])
+        if val_acc > best_val_acc:
+            torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model{val_acc:.1f}.pt'))
+            best_val_acc = val_acc
         print('av_epoch_loss', av_epoch_loss)
 
 

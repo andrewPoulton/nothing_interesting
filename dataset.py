@@ -72,6 +72,9 @@ class SemEvalDataset(Dataset):
         data = self._data[self._data.source == source]
         data = data[data.origin.str.contains(origin)]
         self.data = data
+        if self.train_percent < 100:
+            num_egs = int(self.train_percent*0.01*len(self.data))
+            self.data = self.data.iloc[:num_egs]
 
     def set_data_source(self,source):
         data = self._data[self._data.source == source]
