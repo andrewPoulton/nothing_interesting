@@ -21,7 +21,7 @@
     "norm_type": "layer",
 
     "num_labels": 2,
-    "batch_size": 32,
+    "batch_size": 24,
     "log_interval": 1,
 
     "warmup_steps": 100,
