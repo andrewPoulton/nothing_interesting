@@ -128,7 +128,8 @@ def main(data, val_data, config):
         log_line = f'precision: {p:.5f} | recall: {r:.5f} | f1: {f1:.5f} | accuracy: {val_acc:.5f}\n'
         print(log_line[:-1])
         if val_acc > best_val_acc:
-            torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model{val_acc:.1f}.pt'))
+            print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
+            torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
             best_val_acc = val_acc
         print('av_epoch_loss', av_epoch_loss)
         if av_epoch_loss < .1:
