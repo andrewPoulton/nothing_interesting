@@ -13,6 +13,7 @@ with warnings.catch_warnings():
     from torch.utils.data import SequentialSampler, RandomSampler, BatchSampler, DataLoader
     from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
     import bert_adaptations
+    import wandb
 
 
 
@@ -120,7 +121,7 @@ def configure_model(model, config):
     return model
         
 def main(data, val_data, config):
-    import wandb
+    
     wandb.init(project="prescalenorm")
     config = load_config(config)
     dataset = init_dataset(data)
