@@ -143,6 +143,8 @@ def main(data, val_data, config):
     optimizer = init_optimizer(model, config)
     lr_scheduler = transformers.get_cosine_schedule_with_warmup(optimizer, config.warmup_steps, config.total_steps)
     best_val_acc = 0.0
+    torch.save(config, os.path.join(wandb.run.dir, 'model.config'))
+    wandb.save('*.config')
     while lr_scheduler.last_epoch <= config.total_steps:
         av_epoch_loss =  train_epoch(loader, model, optimizer, lr_scheduler, config, cuda)
         p,r,f1,val_acc = val_loop(model, val_loader, cuda)
@@ -150,12 +152,14 @@ def main(data, val_data, config):
         print(log_line[:-1])
         if val_acc > best_val_acc:
             print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
-            wandb.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
+            torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
             best_val_acc = val_acc
         print('av_epoch_loss', av_epoch_loss)
         if av_epoch_loss < .1:
             break
-    wandb.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
+    torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
+    wandb.save('*.pt')
+    
 
 
 
