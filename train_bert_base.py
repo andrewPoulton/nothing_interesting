@@ -12,9 +12,9 @@ with warnings.catch_warnings():
     from utils import generate_mask, load_config
     from torch.utils.data import SequentialSampler, RandomSampler, BatchSampler, DataLoader
     from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    import bert_adaptations
 
-import wandb
-wandb.init(project="prescalenorm")
+
 
 
 def init_dataset(data):
@@ -100,14 +100,35 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             if lr_scheduler.last_epoch > config.total_steps:
                 break
         return epoch_loss/(i+1)
+
+def configure_model(model, config):
+    if config.from_scratch:
+        model.init_weights()
+
+    if config.tie_query_key:
+        bert_adaptations.tie_query_key(model)
+
+    # set all layers to variable layers, inplace
+    # this transfers all weights as well, skipping norm layers if incompatible
+    # thus the resulting model is pre-norm if the config says so.
+    # Note that key and query weights have to be tied before this
+    bert_adaptations.bert_to_variable_layer(model, config)
+
+    if (config.norm_type != 'layer'):
+        bert_adaptations.replace_layer_norm(model, config)
         
 def main(data, val_data, config):
+    import wandb
+    wandb.init(project="prescalenorm")
     config = load_config(config)
     dataset = init_dataset(data)
     dataset.train_percent = config.train_data_percent
     dataset.set_data_source(config.data_source)
     loader = init_dataloader(dataset, batch_size=config.batch_size)
     model = init_model(type_vocab_size=config.type_vocab_size)
+
+    model = configure_model(model, config)
+
 
     val_dataset = init_dataset(val_data)
     val_dataset.train_percent = config.val_data_percent
@@ -129,12 +150,12 @@ def main(data, val_data, config):
         print(log_line[:-1])
         if val_acc > best_val_acc:
             print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
-            torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
+            wandb.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
             best_val_acc = val_acc
         print('av_epoch_loss', av_epoch_loss)
         if av_epoch_loss < .1:
             break
-    torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
+    wandb.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
 
 
 
