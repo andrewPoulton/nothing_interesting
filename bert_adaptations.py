@@ -13,12 +13,14 @@ def tie_query_key(model):
     for layer in model.bert.encoder.layer:
         layer.attention.self.query.weight = layer.attention.self.key.weight
         layer.attention.self.query.bias = layer.attention.self.key.bias
+    return model
 
 def bert_to_variable_layer(model, variable_layer_config):
     new_layers = [VariableNormTransformerLayer(variable_layer_config) for _ in model.bert.encoder.layer]
     [new_layer.load_from_bert(old_layer) for new_layer, old_layer in zip(new_layers, model.bert.encoder.layer)]
     for i in range(len(model.bert.encoder.layer)):
         model.bert.encoder.layer[i] = new_layers[i]
+    return model
     
 def replace_layer_norm(module, config):
     for attr_str in dir(module):
@@ -35,3 +37,5 @@ def replace_layer_norm(module, config):
             setattr(module, attr_str, replacement_norm)
     for n, ch in module.named_children():
         replace_layer_norm(ch, config)
+    # don't return anythin here as recursed
+    

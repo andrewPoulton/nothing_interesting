@@ -106,16 +106,18 @@ def configure_model(model, config):
         model.init_weights()
 
     if config.tie_query_key:
-        bert_adaptations.tie_query_key(model)
+        model = bert_adaptations.tie_query_key(model)
 
     # set all layers to variable layers, inplace
     # this transfers all weights as well, skipping norm layers if incompatible
     # thus the resulting model is pre-norm if the config says so.
     # Note that key and query weights have to be tied before this
-    bert_adaptations.bert_to_variable_layer(model, config)
+    model = bert_adaptations.bert_to_variable_layer(model, config)
 
     if (config.norm_type != 'layer'):
         bert_adaptations.replace_layer_norm(model, config)
+    
+    return model
         
 def main(data, val_data, config):
     import wandb
@@ -127,7 +129,7 @@ def main(data, val_data, config):
     loader = init_dataloader(dataset, batch_size=config.batch_size)
     model = init_model(type_vocab_size=config.type_vocab_size)
 
-    model = configure_model(model, config)
+    configure_model(model, config)
 
 
     val_dataset = init_dataset(val_data)
