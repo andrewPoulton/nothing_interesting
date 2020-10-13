@@ -129,7 +129,7 @@ def main(data, val_data, config):
     loader = init_dataloader(dataset, batch_size=config.batch_size)
     model = init_model(type_vocab_size=config.type_vocab_size)
 
-    configure_model(model, config)
+    model = configure_model(model, config)
 
 
     val_dataset = init_dataset(val_data)
