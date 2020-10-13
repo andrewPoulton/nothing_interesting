@@ -165,12 +165,12 @@ def main(data, val_data, config):
                 break
         torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
         wandb.save('*.pt')
-        model.cpu()
-        del model
+        return model
+        
     except KeyboardInterrupt:
         wandb.save('*.pt')
-        model.cpu()
-        del model
+        return model
+        
     
 
 
