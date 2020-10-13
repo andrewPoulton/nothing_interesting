@@ -130,6 +130,8 @@ def main(data, val_data, config):
     loader = init_dataloader(dataset, batch_size=config.batch_size)
     model = init_model(type_vocab_size=config.type_vocab_size)
 
+    print(f'from_scratch: {config.from_scratch}', f'prenorm: {config.prenorm}', f'tie_qk: {config.tie_query_key}', f'norm_type: {config.norm_type}')
+
     model = configure_model(model, config)
 
 
@@ -163,6 +165,8 @@ def main(data, val_data, config):
                 break
         torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
         wandb.save('*.pt')
+        model.cpu()
+        del model
     except KeyboardInterrupt:
         wandb.save('*.pt')
         model.cpu()
