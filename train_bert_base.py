@@ -5,6 +5,7 @@ with warnings.catch_warnings():
     import dataset
     import fire
     import os
+    import json
     import random
     import transformers
     import pickle
@@ -148,7 +149,8 @@ def main(data, val_data, config):
     optimizer = init_optimizer(model, config)
     lr_scheduler = transformers.get_cosine_schedule_with_warmup(optimizer, config.warmup_steps, config.total_steps)
     best_val_acc = 0.0
-    torch.save(config, os.path.join(wandb.run.dir, 'model.config'))
+    # torch.save(config, os.path.join(wandb.run.dir, 'model.config'))
+    json.dump(config.__dict__, open(os.path.join(wandb.run.dir, 'model.config'), 'w'))
     wandb.save('*.config')
     try:
         while lr_scheduler.last_epoch <= config.total_steps:
@@ -159,12 +161,13 @@ def main(data, val_data, config):
             if val_acc > best_val_acc:
                 print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
                 torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
+                wandb.save('*.pt')
                 best_val_acc = val_acc
             print('av_epoch_loss', av_epoch_loss)
             if av_epoch_loss < .1:
                 break
         torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
-        wandb.save('*.pt')
+        
         return model
         
     except KeyboardInterrupt:
