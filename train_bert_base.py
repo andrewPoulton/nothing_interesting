@@ -91,10 +91,10 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             lr_scheduler.step()
 
             #move stuff off GPU
-            batch.cpu()
-            logits = logits.cpu().detach().argmax(-1).squeeze()
+            # batch.cpu()
+            # logits = logits.cpu().detach().argmax(-1).squeeze()
             if batch.labels.size(0)>1:
-                acc = accuracy_score(batch.labels, logits)
+                acc = accuracy_score(batch.labels.cpu(), logits.cpu().detach().argmax(-1).squeeze())
             else:
                 acc = 0.
             # if torch._np.isnan(loss.item()):
