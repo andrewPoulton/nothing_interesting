@@ -90,9 +90,7 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             optimizer.step()
             lr_scheduler.step()
 
-            #move stuff off GPU
-            # batch.cpu()
-            # logits = logits.cpu().detach().argmax(-1).squeeze()
+           
             if batch.labels.size(0)>1:
                 acc = accuracy_score(batch.labels.cpu(), logits.cpu().detach().argmax(-1).squeeze())
             else:
@@ -106,6 +104,9 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             pbar.update(1)
             if lr_scheduler.last_epoch > config.total_steps:
                 break
+        #  move stuff off GPU
+        batch.cpu()
+        logits = logits.cpu().detach().argmax(-1).squeeze()
         return epoch_loss/(i+1)
 
 def configure_model(model, config):
@@ -153,22 +154,32 @@ def main(data, val_data, config):
         model.cuda()
     optimizer = init_optimizer(model, config)
     lr_scheduler = transformers.get_cosine_schedule_with_warmup(optimizer, config.warmup_steps, config.total_steps)
-    best_val_acc = 0.0
+    # best_val_acc = 0.0
     # torch.save(config, os.path.join(wandb.run.dir, 'model.config'))
     json.dump(config.__dict__, open(os.path.join(wandb.run.dir, 'model_config.json'), 'w'))
     wandb.save('*.config')
+    best_f1 = 0.0
+    patience = 0
     try:
         while lr_scheduler.last_epoch <= config.total_steps:
             av_epoch_loss =  train_epoch(loader, model, optimizer, lr_scheduler, config, cuda)
+            #tidy stuff up every epoch
+            gc.collect()
+            torch.cuda.empty_cache()
+
             p,r,f1,val_acc = val_loop(model, val_loader, cuda)
             log_line = f'precision: {p:.5f} | recall: {r:.5f} | f1: {f1:.5f} | accuracy: {val_acc:.5f}\n'
             print(log_line[:-1])
-            if val_acc > best_val_acc:
+            print('av_epoch_loss', av_epoch_loss)
+            if f1 > best_f1:
                 print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
                 torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
                 wandb.save('*.pt')
                 best_val_acc = val_acc
-            print('av_epoch_loss', av_epoch_loss)
+            else:
+                patience +=1
+                if patience >= 3:
+                    break
             if av_epoch_loss < .2:
                 break
         torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
