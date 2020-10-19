@@ -175,7 +175,7 @@ def main(data, val_data, config):
                 print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
                 torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_best_f1.pt'))
                 wandb.save('*.pt')
-                best_val_acc = val_acc
+                best_f1 = f1
                 patience = max((0, patience-1))
             else:
                 patience +=1
