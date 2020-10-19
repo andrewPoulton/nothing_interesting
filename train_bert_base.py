@@ -176,6 +176,7 @@ def main(data, val_data, config):
                 torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_best_f1.pt'))
                 wandb.save('*.pt')
                 best_val_acc = val_acc
+                patience = max((0, patience-1))
             else:
                 patience +=1
                 if patience >= 3:
