@@ -173,7 +173,7 @@ def main(data, val_data, config):
             print('av_epoch_loss', av_epoch_loss)
             if f1 > best_f1:
                 print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
-                torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
+                torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_best_f1.pt'))
                 wandb.save('*.pt')
                 best_val_acc = val_acc
             else:
