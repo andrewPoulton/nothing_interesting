@@ -34,6 +34,14 @@ class Batch(SimpleNamespace):
             except AttributeError:
                 pass
 
+    def cpu(self):
+        atts = self.__dict__
+        for att, val in atts.items():
+            try:
+                self.__dict__[att] = val.cpu()
+            except AttributeError:
+                pass
+
     def __contains__(self, item):
         return item in self.__dict__
 

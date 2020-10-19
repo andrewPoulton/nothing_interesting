@@ -15,6 +15,7 @@ with warnings.catch_warnings():
     from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
     import bert_adaptations
     import wandb
+    import gc
 
 
 
@@ -88,8 +89,12 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
             torch.nn.utils.clip_grad_norm_(model.parameters(), 10.)
             optimizer.step()
             lr_scheduler.step()
+
+            #move stuff off GPU
+            batch.cpu()
+            logits = logits.cpu().detach().argmax(-1).squeeze()
             if batch.labels.size(0)>1:
-                acc = accuracy_score(batch.labels.cpu(), logits.argmax(-1).squeeze().cpu().detach())
+                acc = accuracy_score(batch.labels, logits)
             else:
                 acc = 0.
             # if torch._np.isnan(loss.item()):
@@ -150,7 +155,7 @@ def main(data, val_data, config):
     lr_scheduler = transformers.get_cosine_schedule_with_warmup(optimizer, config.warmup_steps, config.total_steps)
     best_val_acc = 0.0
     # torch.save(config, os.path.join(wandb.run.dir, 'model.config'))
-    json.dump(config.__dict__, open(os.path.join(wandb.run.dir, 'model.config'), 'w'))
+    json.dump(config.__dict__, open(os.path.join(wandb.run.dir, 'model_config.json'), 'w'))
     wandb.save('*.config')
     try:
         while lr_scheduler.last_epoch <= config.total_steps:
@@ -160,25 +165,31 @@ def main(data, val_data, config):
             print(log_line[:-1])
             if val_acc > best_val_acc:
                 print("saving to: ", os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
-                torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
+                torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_best_acc.pt'))
                 wandb.save('*.pt')
                 best_val_acc = val_acc
             print('av_epoch_loss', av_epoch_loss)
-            if av_epoch_loss < .1:
+            if av_epoch_loss < .2:
                 break
-        torch.save(model.state_dict(), os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
-        
+        torch.save([model.state_dict(), config.__dict__], os.path.join(wandb.run.dir, f'full_bert_model_{lr_scheduler.last_epoch}_steps.pt'))
+        #Move stuff off the gpu
+        model.cpu()
+        #This is for sure a kinda dumb way of doing it, but the least mentally taxing right now
+        optimizer = init_optimizer(model, config)
+        gc.collect()
+        torch.cuda.empty_cache()
         return model
         
     except KeyboardInterrupt:
         wandb.save('*.pt')
+        #Move stuff off the gpu
+        model.cpu()
+        #This is for sure a kinda dumb way of doing it, but the least mentally taxing right now
+        optimizer = init_optimizer(model, config)
+        gc.collect()
+        torch.cuda.empty_cache()
         return model
         
     
-
-
-
-
-
 if __name__ == "__main__":
     fire.Fire(main)
