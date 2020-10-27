@@ -10,7 +10,7 @@ with warnings.catch_warnings():
     import transformers
     import pickle
     from tqdm import tqdm
-    from utils import generate_mask, load_config
+    from utils import generate_mask, load_config, init_model, configure_model
     from torch.utils.data import SequentialSampler, RandomSampler, BatchSampler, DataLoader
     from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
     import bert_adaptations
@@ -29,13 +29,7 @@ def init_dataloader(dataset, batch_size=32, random=True):
     loader = DataLoader(dataset, batch_sampler=batch_sampler, collate_fn=dataset.collater, num_workers=4)
     return loader
 
-def init_model(type_vocab_size):
-    model = transformers.BertForSequenceClassification.from_pretrained('bert-base-uncased')
-    model.config.token_type_embeddings = type_vocab_size 
-    emb = torch.nn.Embedding(type_vocab_size, model.config.hidden_size)
-    emb.weight.data.normal_(mean=0.0, std = model.config.initializer_range)  
-    model.bert.embeddings.token_type_embeddings = emb
-    return model
+
 
 def init_optimizer(model, config):
     return torch.optim.Adam(model.parameters(), lr = config.max_lr)
@@ -109,23 +103,7 @@ def train_epoch(loader, model, optimizer, lr_scheduler, config, cuda):
         logits = logits.cpu().detach().argmax(-1).squeeze()
         return epoch_loss/(i+1)
 
-def configure_model(model, config):
-    if config.from_scratch:
-        model.init_weights()
 
-    if config.tie_query_key:
-        model = bert_adaptations.tie_query_key(model)
-
-    # set all layers to variable layers, inplace
-    # this transfers all weights as well, skipping norm layers if incompatible
-    # thus the resulting model is pre-norm if the config says so.
-    # Note that key and query weights have to be tied before this
-    model = bert_adaptations.bert_to_variable_layer(model, config)
-
-    if (config.norm_type != 'layer'):
-        bert_adaptations.replace_layer_norm(model, config)
-    
-    return model
         
 def main(data, val_data, config):
     
