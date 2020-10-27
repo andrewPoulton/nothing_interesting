@@ -60,10 +60,12 @@ def calculate_attributes(model, val_loader, debug = False):
         for i, batch in enumerate(val_loader):
             if __CUDA__: batch.cuda()
             inputs_embeds ,baseline, answer_length = inspection_parameters(model, batch)
+            pbar.set_description('Calculating significance')
             with torch.no_grad(): 
                 preds, attentions = model(inputs_embeds = inputs_embeds, token_type_ids = batch.token_type_ids, output_attentions = True)
                 predicted_class = preds.cpu().squeeze().argmax().item()
                 significance = token_significance(attentions)
+            pbar.set_description('Calculating integrated gradients...')
             integrated_gradients = ig.attribute(inputs_embeds, 
                                     baselines=baseline, 
                                     target = predicted_class,
@@ -75,6 +77,7 @@ def calculate_attributes(model, val_loader, debug = False):
             attributes['batch_ids'].append(batch.input.cpu().numpy().tolist())
             attributes['token_significance'].append(significance)
             attributes['integrated_gradients'].append(integrated_gradients)
+            pbar.update(1)
             if debug and (i>10):
                 break
     return attributes
