@@ -10,8 +10,10 @@ from captum.attr import IntegratedGradients
 __CUDA__ = torch.cuda.is_available()
 
 def load_model():
-    model, config = torch.load('full_bert_model_best_f1.pt', map_location=None if __CUDA__ else 'cpu' )
-    return model, SimpleNamespace(**config)
+    state_dict, config = torch.load('full_bert_model_best_f1.pt', map_location=None if __CUDA__ else 'cpu' )
+    config =  SimpleNamespace(**config)
+    model = load_model_from_state_dict(config, state_dict)
+    return model, config
     
 def make_filename(config):
     norm = config.norm_type
