@@ -52,7 +52,7 @@ def calculate_attributes(model, val_loader, debug = False):
         'token_significance': [],
         'integrated_gradients': [],
     }
-    
+
     ig = IntegratedGradients(inspection_forward)
     with tqdm(total= len(val_loader.batch_sampler)) as pbar:
         for i, batch in enumerate(val_loader):
@@ -76,3 +76,15 @@ def calculate_attributes(model, val_loader, debug = False):
             if debug and (i>10):
                 break
     return attributes
+
+
+def main():
+    model, config = load_model()
+    fname = make_filename(config)
+    if __CUDA__: model.cuda()
+    val_loader = get_val_dataloader()
+    attributes = calculate_attributes(model, val_loader)
+    torch.save([attributes, config.__dict__], fname)
+
+if __name__ == "__main__":
+    main()
