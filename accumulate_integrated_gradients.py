@@ -1,6 +1,7 @@
 import torch
 import dataset as ds
 import os
+import fire
 from types import SimpleNamespace
 from tqdm import tqdm
 from utils import load_model_from_state_dict
@@ -15,13 +16,13 @@ def load_model():
     model = load_model_from_state_dict(config, state_dict)
     return model, config
     
-def make_filename(config):
+def make_filename(runid, config):
     norm = config.norm_type
     prenorm = config.prenorm
     from_scratch = config.from_scratch
-    fname = f'{norm}{"_pn_" if prenorm else ""}{"_fromscratch_" if from_scratch else "_pretrained_"}'
+    fname = f'{norm}{"_pn" if prenorm else ""}{"_fromscratch_" if from_scratch else "_pretrained_"}'
     current_results = [f for f in os.listdir('results') if f.startswith(fname)]
-    return f'results/{fname}_{len(current_results)}.result'
+    return f'results/{fname}{runid}_{len(current_results)}.result'
 
 
 
@@ -83,13 +84,13 @@ def calculate_attributes(model, val_loader, debug = False):
     return attributes
 
 
-def main():
+def main(runid):
     model, config = load_model()
-    fname = make_filename(config)
+    fname = make_filename(runid, config)
     if __CUDA__: model.cuda()
     val_loader = get_val_dataloader()
     attributes = calculate_attributes(model, val_loader)
     torch.save([attributes, config.__dict__], fname)
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)
