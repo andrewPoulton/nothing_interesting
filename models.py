@@ -49,6 +49,51 @@ class Pooler(nn.Module):
         pooled_output = self.activation(pooled_output)
         return pooled_output
 
+
+class DBertEmbeddings(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=0)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size, padding_idx=0)
+        self.detach_qa = config.detach_qa
+
+        self.LayerNorm = nn.LayerNorm(config.dim, eps=1e-12)
+        self.dropout = nn.Dropout(config.dropout)
+
+    def forward(self, input_ids = None, inputs_embeds = None, token_type_ids = None):
+        """
+        Parameters
+        ----------
+        input_ids: torch.tensor(bs, max_seq_length)
+            The token ids to embed.
+
+        Outputs
+        -------
+        embeddings: torch.tensor(bs, max_seq_length, dim)
+            The embedded tokens (plus position embeddings, no token_type embeddings)
+        """
+        seq_length = input_ids.size(1)
+        position_ids = torch.arange(seq_length, dtype=torch.long, device=input_ids.device)  # (max_seq_length)
+        position_ids = position_ids.unsqueeze(0).expand_as(input_ids)  # (bs, max_seq_length)
+
+        if not inputs_embeds is None:
+            word_embeddings = inputs_embeds
+        else:
+            word_embeddings = self.word_embeddings(input_ids)  # (bs, max_seq_length, dim)
+        position_embeddings = self.position_embeddings(position_ids)  # (bs, max_seq_length, dim)
+        if self.detach_qa:
+            # position_embeddings.detach_()
+            qa_lens = token_type_ids.shape[-1] - (token_type_ids.eq(self.config.type_vocab_size-1) | token_type_ids.eq(0)).sum(1) + 1
+            for i in range(len(word_embeddings)):
+                 
+                word_embeddings[i][1:qa_lens[i]] = word_embeddings[i][1:qa_lens[i]].detach()
+
+        embeddings = word_embeddings + position_embeddings  # (bs, max_seq_length, dim)
+        embeddings = self.LayerNorm(embeddings)  # (bs, max_seq_length, dim)toke
+        embeddings = self.dropout(embeddings)  # (bs, max_seq_length, dim)
+        return embeddings
 class VariableNormEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings.
     """

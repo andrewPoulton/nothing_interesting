@@ -2,6 +2,7 @@ import streamlit as st
 # from dataset import SemEvalDataset
 import pandas as pd
 import sys
+import os
 from streamlit.components.v1 import components
 
 user = sys.argv[1]
@@ -15,30 +16,26 @@ def init():
     df = pd.read_csv('data/flat_semeval5way_test.csv')
     df = df[(df.origin == 'unseen_answers')&(df.source == 'scientsbank')]
     df['spans'] = df['student_answers'].apply(spanify)
-    return df
+
+    return df.sample(len(df))
 
 data = init()
 
+# _component_func = components.declare_component(
+#         # We give the component a simple, descriptive name ("my_component"
+#         # does not fit this bill, so please choose something better for your
+#         # own component :)
+#         "my_component",
+#         # Pass `url` here to tell Streamlit that the component will be served
+#         # by the local dev server that you run via `npm run start`.
+#         # (This is useful while your component is in development.)
+#         url="http://localhost:3001",
+#     )
 
-_css = r"""
-<style>
-    .word:hover{
-        background-color: green;
-        color: white;
-        cursor: pointer;
-    }
-</style>
-"""
-_component_func = components.declare_component(
-        # We give the component a simple, descriptive name ("my_component"
-        # does not fit this bill, so please choose something better for your
-        # own component :)
-        "my_component",
-        # Pass `url` here to tell Streamlit that the component will be served
-        # by the local dev server that you run via `npm run start`.
-        # (This is useful while your component is in development.)
-        url="http://localhost:3001",
-    )
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+build_dir = os.path.join(parent_dir, "component-build")
+_component_func = components.declare_component("my_component", path=build_dir)
+
 
 def my_component(name, key=None):
     """Create a new instance of "my_component".
@@ -79,7 +76,8 @@ st.header("**Question:**")
 question = st.empty()
 st.header("**Reference answer:**")
 reference_answers = st.empty()
-st.header("**Student answer:**")
+student_answer_header = st.empty()
+
 
 next_idx = data_idx.number_input(
     "Select example", 
@@ -87,17 +85,17 @@ next_idx = data_idx.number_input(
     max_value=len(data)-1,
     value=0,
     step=1)
+
 row = data.iloc[next_idx]
-css.markdown(_css, unsafe_allow_html=True)
 question.markdown(row.question_text)
 reference_answers.markdown(row.reference_answers)
-
+student_answer_header.header(f"**Student anwer ({row.label}):**")
 annotations = my_component(row.spans)
 print(annotations)
 # increment_idx = st.button("Next question/student response")
 
 if len(annotations) >0:
-    with open(f"annotations/scientsbank_unseen_answers_{next_idx}.annotation", "a") as file:
+    with open(f"annotations/{user}_scientsbank_unseen_answers_{row.name}.annotation", "a") as file:
         file.write(",".join(annotations)+"\n")
     
 
